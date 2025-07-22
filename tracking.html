@@ -424,6 +424,14 @@
                     trackOrder();
                 }
             });
+
+            // Check if order number is passed as URL parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderParam = urlParams.get('order');
+            if (orderParam) {
+                document.getElementById('order-number-input').value = orderParam;
+                trackOrder();
+            }
         });
 
         // Export function for global access

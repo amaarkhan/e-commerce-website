@@ -1052,6 +1052,17 @@ function viewOrderDetails() {
     alert(orderDetails);
 }
 
+// Track Current Order - redirect to tracking page with order number
+function trackCurrentOrder() {
+    if (orders.length > 0) {
+        const lastOrder = orders[orders.length - 1];
+        // Redirect to tracking page with order number as URL parameter
+        window.open(`tracking.html?order=${lastOrder.orderNumber}`, '_blank');
+    } else {
+        alert('No order found to track.');
+    }
+}
+
 // Send Order Confirmation Email (Real Email with EmailJS)
 function sendOrderConfirmationEmail(order) {
     // Initialize EmailJS (you need to get these from emailjs.com)
@@ -1123,7 +1134,11 @@ function sendOrderConfirmationEmail(order) {
             estimated_delivery: estimatedDelivery.toLocaleDateString(),
             customer_name: `${order.customer.firstName} ${order.customer.lastName}`,
             shipping_address: `${order.customer.address}, ${order.customer.city}, ${order.customer.state} ${order.customer.zipCode}`,
-            payment_method: formatPaymentMethodForEmail(order.payment.method)
+            payment_method: formatPaymentMethodForEmail(order.payment.method),
+            
+            // Tracking information
+            tracking_url: `${window.location.origin}/tracking.html?order=${order.orderNumber}`,
+            website_url: window.location.origin
         };
         
         // Debug: Log template parameters
@@ -1257,3 +1272,4 @@ window.nextStep = nextStep;
 window.prevStep = prevStep;
 window.closeOrderConfirmation = closeOrderConfirmation;
 window.viewOrderDetails = viewOrderDetails;
+window.trackCurrentOrder = trackCurrentOrder;
