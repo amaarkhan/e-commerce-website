@@ -19,6 +19,13 @@ A modern, fully responsive e-commerce website built with HTML, CSS, and JavaScri
   - Update quantities
   - Persistent cart (saves to localStorage)
   - Sidebar cart with smooth animations
+- **Complete Order System**:
+  - Multi-step checkout process (Shipping → Payment → Review)
+  - Multiple payment methods (Cash on Delivery, Bank Transfer, Credit Card)
+  - Order confirmation with email simulation
+  - Order management system for store owners
+  - Order tracking for customers
+  - Persistent order storage (localStorage)
 - **Interactive Elements**:
   - Smooth scrolling navigation
   - Hover effects and animations
@@ -33,15 +40,45 @@ A modern, fully responsive e-commerce website built with HTML, CSS, and JavaScri
 4. **About**: Company information with features
 5. **Contact**: Contact form and information
 6. **Footer**: Links, newsletter signup, and social media
+7. **Order Management**: Complete order processing system
+8. **Order Tracking**: Customer order tracking interface
+
+## 🛒 Order Management System
+
+### For Customers
+- **Multi-step Checkout**: Guided checkout process with shipping info, payment selection, and order review
+- **Payment Options**: 
+  - Cash on Delivery (COD)
+  - Bank Transfer (with bank details display)
+  - Credit/Debit Card (with form validation)
+- **Order Confirmation**: Immediate confirmation with order details and estimated delivery
+- **Order Tracking**: Track order status with timeline visualization
+
+### For Store Owners
+- **Admin Panel**: Comprehensive order management at `orders.html`
+- **Order Dashboard**: Statistics and analytics (total orders, revenue, pending/completed orders)
+- **Order Management**: View, update status, and delete orders
+- **Order Filtering**: Filter by status, date range, and search by customer details
+- **Detailed Order View**: Complete order information including customer details and items
+
+### Order Features
+- **Automatic Order Numbers**: Generated unique order IDs
+- **Order Status Tracking**: Confirmed → Processing → Shipped → Delivered
+- **Free Shipping**: Automatic free shipping calculation for orders over $50
+- **Tax Calculation**: 8% tax automatically applied
+- **Data Persistence**: All orders saved to browser localStorage
+- **Email Simulation**: Order confirmation email simulation (console logged)
 
 ## 📁 Project Structure
 
 ```
 e-commerce/
-├── index.html          # Main HTML file
-├── styles.css          # All CSS styles and responsive design
-├── script.js          # JavaScript functionality
-└── README.md          # Project documentation
+├── index.html          # Main HTML file with shopping cart
+├── orders.html         # Order management admin panel
+├── tracking.html       # Customer order tracking page
+├── style.css           # All CSS styles and responsive design
+├── script.js           # JavaScript functionality and order system
+└── README.md           # Project documentation
 ```
 
 ## 🛠️ Technologies Used

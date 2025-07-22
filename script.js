@@ -128,6 +128,22 @@ function initializeApp() {
     loadProducts();
     updateCartDisplay();
     loadCartFromStorage();
+    
+    // Initialize EmailJS
+    initializeEmailJS();
+}
+
+// Initialize EmailJS
+function initializeEmailJS() {
+    // EmailJS configuration
+    const EMAILJS_PUBLIC_KEY = '5nivqhNinSfXdeTU5';
+    
+    if (typeof emailjs !== 'undefined') {
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+        console.log('✅ EmailJS initialized successfully');
+    } else {
+        console.warn('⚠️ EmailJS library not found. Email functionality will not work.');
+    }
 }
 
 // Setup Event Listeners
@@ -652,3 +668,592 @@ window.updateCartQuantity = updateCartQuantity;
 window.toggleCart = toggleCart;
 window.filterProducts = filterProducts;
 window.scrollToSection = scrollToSection;
+
+// Order Management System
+let orders = [];
+let currentStep = 1;
+let orderData = {
+    customer: {},
+    payment: {},
+    items: [],
+    totals: {}
+};
+
+// Load orders from localStorage
+function loadOrdersFromStorage() {
+    const savedOrders = localStorage.getItem('shophub_orders');
+    if (savedOrders) {
+        orders = JSON.parse(savedOrders);
+    }
+}
+
+// Save orders to localStorage
+function saveOrdersToStorage() {
+    localStorage.setItem('shophub_orders', JSON.stringify(orders));
+}
+
+// Start Checkout Process
+function startCheckout() {
+    if (cart.length === 0) {
+        alert('Your cart is empty. Please add some items before checkout.');
+        return;
+    }
+    
+    // Reset checkout data
+    currentStep = 1;
+    orderData = {
+        customer: {},
+        payment: {},
+        items: [...cart],
+        totals: calculateOrderTotals()
+    };
+    
+    // Show checkout modal
+    const checkoutModal = document.getElementById('checkout-modal');
+    checkoutModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Reset steps
+    showStep(1);
+    updateStepIndicators();
+    
+    // Setup payment method change listeners
+    setupPaymentMethodListeners();
+}
+
+// Close Checkout Modal
+function closeCheckout() {
+    const checkoutModal = document.getElementById('checkout-modal');
+    checkoutModal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    
+    // Reset form
+    document.getElementById('checkout-form').reset();
+    currentStep = 1;
+}
+
+// Calculate Order Totals
+function calculateOrderTotals() {
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const shipping = subtotal > 50 ? 0 : 5.99; // Free shipping over $50
+    const tax = subtotal * 0.08; // 8% tax
+    const total = subtotal + shipping + tax;
+    
+    return {
+        subtotal: subtotal,
+        shipping: shipping,
+        tax: tax,
+        total: total
+    };
+}
+
+// Show Step
+function showStep(step) {
+    // Hide all steps
+    document.querySelectorAll('.checkout-step').forEach(stepDiv => {
+        stepDiv.classList.add('hidden');
+    });
+    
+    // Show current step
+    document.getElementById(`step-${step}`).classList.remove('hidden');
+    currentStep = step;
+    
+    // Update step 3 (review) content when shown
+    if (step === 3) {
+        updateOrderReview();
+    }
+}
+
+// Update Step Indicators
+function updateStepIndicators() {
+    document.querySelectorAll('.step').forEach((step, index) => {
+        const stepNumber = index + 1;
+        step.classList.remove('active', 'completed');
+        
+        if (stepNumber < currentStep) {
+            step.classList.add('completed');
+        } else if (stepNumber === currentStep) {
+            step.classList.add('active');
+        }
+    });
+}
+
+// Next Step
+function nextStep() {
+    if (currentStep === 1) {
+        if (validateShippingInfo()) {
+            saveShippingInfo();
+            showStep(2);
+            updateStepIndicators();
+        }
+    } else if (currentStep === 2) {
+        if (validatePaymentInfo()) {
+            savePaymentInfo();
+            showStep(3);
+            updateStepIndicators();
+        }
+    }
+}
+
+// Previous Step
+function prevStep() {
+    if (currentStep > 1) {
+        showStep(currentStep - 1);
+        updateStepIndicators();
+    }
+}
+
+// Validate Shipping Information
+function validateShippingInfo() {
+    const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'address', 'city', 'zipCode', 'state'];
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        const input = document.getElementById(field);
+        if (!input.value.trim()) {
+            input.style.borderColor = '#e74c3c';
+            isValid = false;
+        } else {
+            input.style.borderColor = '#ddd';
+        }
+    });
+    
+    // Validate email format
+    const email = document.getElementById('email').value;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        document.getElementById('email').style.borderColor = '#e74c3c';
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        alert('Please fill in all required fields correctly.');
+    }
+    
+    return isValid;
+}
+
+// Validate Payment Information
+function validatePaymentInfo() {
+    const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+    
+    if (paymentMethod === 'card') {
+        const cardNumber = document.getElementById('cardNumber').value;
+        const expiryDate = document.getElementById('expiryDate').value;
+        const cvv = document.getElementById('cvv').value;
+        const cardName = document.getElementById('cardName').value;
+        
+        if (!cardNumber || !expiryDate || !cvv || !cardName) {
+            alert('Please fill in all card details.');
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Save Shipping Information
+function saveShippingInfo() {
+    orderData.customer = {
+        firstName: document.getElementById('firstName').value,
+        lastName: document.getElementById('lastName').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        address: document.getElementById('address').value,
+        city: document.getElementById('city').value,
+        zipCode: document.getElementById('zipCode').value,
+        state: document.getElementById('state').value
+    };
+}
+
+// Save Payment Information
+function savePaymentInfo() {
+    const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+    
+    orderData.payment = {
+        method: paymentMethod
+    };
+    
+    if (paymentMethod === 'card') {
+        orderData.payment.cardDetails = {
+            cardNumber: '****-****-****-' + document.getElementById('cardNumber').value.slice(-4),
+            cardName: document.getElementById('cardName').value
+        };
+    }
+}
+
+// Setup Payment Method Listeners
+function setupPaymentMethodListeners() {
+    const paymentMethods = document.querySelectorAll('input[name="paymentMethod"]');
+    
+    paymentMethods.forEach(method => {
+        method.addEventListener('change', function() {
+            const bankDetails = document.getElementById('bank-details');
+            const cardDetails = document.getElementById('card-details');
+            
+            // Hide all payment details
+            bankDetails.classList.add('hidden');
+            cardDetails.classList.add('hidden');
+            
+            // Show relevant payment details
+            if (this.value === 'bank-transfer') {
+                bankDetails.classList.remove('hidden');
+            } else if (this.value === 'card') {
+                cardDetails.classList.remove('hidden');
+            }
+        });
+    });
+}
+
+// Update Order Review
+function updateOrderReview() {
+    // Update order items
+    const orderItemsContainer = document.getElementById('order-items-review');
+    orderItemsContainer.innerHTML = cart.map(item => `
+        <div class="order-item">
+            <img src="${item.image}" alt="${item.name}">
+            <div class="order-item-info">
+                <div class="order-item-name">${item.name}</div>
+                <div class="order-item-details">Quantity: ${item.quantity}</div>
+            </div>
+            <div class="order-item-price">$${(item.price * item.quantity).toFixed(2)}</div>
+        </div>
+    `).join('');
+    
+    // Update totals
+    const totals = calculateOrderTotals();
+    document.getElementById('order-subtotal').textContent = `$${totals.subtotal.toFixed(2)}`;
+    document.getElementById('order-shipping').textContent = totals.shipping === 0 ? 'FREE' : `$${totals.shipping.toFixed(2)}`;
+    document.getElementById('order-tax').textContent = `$${totals.tax.toFixed(2)}`;
+    document.getElementById('order-grand-total').textContent = `$${totals.total.toFixed(2)}`;
+    
+    // Update shipping address
+    const shippingAddress = `
+        ${orderData.customer.firstName} ${orderData.customer.lastName}<br>
+        ${orderData.customer.address}<br>
+        ${orderData.customer.city}, ${orderData.customer.state} ${orderData.customer.zipCode}<br>
+        ${orderData.customer.phone}<br>
+        ${orderData.customer.email}
+    `;
+    document.getElementById('shipping-address-review').innerHTML = shippingAddress;
+    
+    // Update payment method
+    let paymentMethodText = '';
+    switch (orderData.payment.method) {
+        case 'cod':
+            paymentMethodText = 'Cash on Delivery';
+            break;
+        case 'bank-transfer':
+            paymentMethodText = 'Bank Transfer';
+            break;
+        case 'card':
+            paymentMethodText = `Credit/Debit Card (${orderData.payment.cardDetails?.cardNumber || '****-****-****-****'})`;
+            break;
+    }
+    document.getElementById('payment-method-review').textContent = paymentMethodText;
+}
+
+// Place Order
+function placeOrder(event) {
+    event.preventDefault();
+    
+    // Generate order number
+    const orderNumber = 'ORD-' + Date.now();
+    
+    // Create order object
+    const order = {
+        orderNumber: orderNumber,
+        date: new Date().toISOString(),
+        customer: orderData.customer,
+        payment: orderData.payment,
+        items: orderData.items,
+        totals: calculateOrderTotals(),
+        status: 'confirmed'
+    };
+    
+    // Save order
+    orders.push(order);
+    saveOrdersToStorage();
+    
+    // Clear cart
+    cart = [];
+    updateCartDisplay();
+    saveCartToStorage();
+    
+    // Close checkout modal
+    closeCheckout();
+    
+    // Show order confirmation
+    showOrderConfirmation(order);
+    
+    // Send order confirmation email (simulated)
+    sendOrderConfirmationEmail(order);
+}
+
+// Show Order Confirmation
+function showOrderConfirmation(order) {
+    const confirmationModal = document.getElementById('order-confirmation-modal');
+    
+    // Populate order details
+    document.getElementById('order-number').textContent = order.orderNumber;
+    document.getElementById('confirmation-total').textContent = `$${order.totals.total.toFixed(2)}`;
+    
+    let paymentText = '';
+    switch (order.payment.method) {
+        case 'cod':
+            paymentText = 'Cash on Delivery';
+            break;
+        case 'bank-transfer':
+            paymentText = 'Bank Transfer';
+            break;
+        case 'card':
+            paymentText = 'Credit/Debit Card';
+            break;
+    }
+    document.getElementById('confirmation-payment').textContent = paymentText;
+    
+    // Calculate estimated delivery (3-7 business days)
+    const deliveryDate = new Date();
+    deliveryDate.setDate(deliveryDate.getDate() + 5);
+    document.getElementById('estimated-delivery').textContent = deliveryDate.toLocaleDateString();
+    
+    // Show modal
+    confirmationModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// Close Order Confirmation
+function closeOrderConfirmation() {
+    const confirmationModal = document.getElementById('order-confirmation-modal');
+    confirmationModal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+}
+
+// View Order Details
+function viewOrderDetails() {
+    closeOrderConfirmation();
+    
+    // Here you could implement a detailed order view
+    // For now, we'll just show an alert with order info
+    const lastOrder = orders[orders.length - 1];
+    let orderDetails = `Order Details:\n\n`;
+    orderDetails += `Order Number: ${lastOrder.orderNumber}\n`;
+    orderDetails += `Date: ${new Date(lastOrder.date).toLocaleDateString()}\n`;
+    orderDetails += `Customer: ${lastOrder.customer.firstName} ${lastOrder.customer.lastName}\n`;
+    orderDetails += `Email: ${lastOrder.customer.email}\n`;
+    orderDetails += `Total: $${lastOrder.totals.total.toFixed(2)}\n`;
+    orderDetails += `Payment: ${lastOrder.payment.method}\n`;
+    orderDetails += `Status: ${lastOrder.status}\n\n`;
+    orderDetails += `Items:\n`;
+    lastOrder.items.forEach(item => {
+        orderDetails += `- ${item.name} (${item.quantity}x) - $${(item.price * item.quantity).toFixed(2)}\n`;
+    });
+    
+    alert(orderDetails);
+}
+
+// Send Order Confirmation Email (Real Email with EmailJS)
+function sendOrderConfirmationEmail(order) {
+    // Initialize EmailJS (you need to get these from emailjs.com)
+    // REPLACE THESE WITH YOUR ACTUAL VALUES FROM EMAILJS DASHBOARD:
+    const EMAILJS_SERVICE_ID = 'service_9n2rlr5';    // Replace with your Service ID (e.g., service_abc123)
+    const EMAILJS_TEMPLATE_ID = 'template_icysguc';  // Replace with your Template ID (e.g., template_xyz789)
+    const EMAILJS_PUBLIC_KEY = '5nivqhNinSfXdeTU5';    // Replace with your Public Key (e.g., user_abcdefghijk)
+    
+    // Debug: Log the configuration
+    console.log('EmailJS Configuration:');
+    console.log('Service ID:', EMAILJS_SERVICE_ID);
+    console.log('Template ID:', EMAILJS_TEMPLATE_ID);
+    console.log('Public Key:', EMAILJS_PUBLIC_KEY);
+    
+    // Check if EmailJS is configured
+    if (typeof emailjs === 'undefined') {
+        console.error('❌ EmailJS not loaded. Make sure the EmailJS script is included in your HTML.');
+        alert('Email service not available. Please check the configuration.');
+        return;
+    }
+    
+    console.log('✅ EmailJS library loaded successfully');
+    
+    // If not configured, fall back to simulation
+    if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
+        console.log('EmailJS not configured. Order confirmation email simulation:', order.customer.email);
+        console.log('Order details:', order);
+        
+        // Show user that email would be sent
+        setTimeout(() => {
+            alert(`Order confirmation email would be sent to: ${order.customer.email}\n\nTo enable real emails, configure EmailJS in script.js`);
+        }, 1000);
+        return;
+    }
+    
+    try {
+        // Prepare email template parameters to match your EmailJS template
+        const estimatedDelivery = new Date(order.date);
+        estimatedDelivery.setDate(estimatedDelivery.getDate() + 5); // 5 business days
+        
+        // Create orders array for the template (your template expects {{#orders}} loop)
+        const ordersArray = order.items.map(item => ({
+            name: item.name,
+            image_url: item.image,
+            units: item.quantity,
+            price: (item.price * item.quantity).toFixed(2)
+        }));
+        
+        const templateParams = {
+            // Email recipient
+            email: order.customer.email,
+            to_name: `${order.customer.firstName} ${order.customer.lastName}`,
+            
+            // Order details
+            order_id: order.orderNumber,
+            
+            // Orders array for the loop in your template
+            orders: ordersArray,
+            
+            // Cost breakdown
+            cost: {
+                shipping: order.totals.shipping.toFixed(2),
+                tax: order.totals.tax.toFixed(2),
+                total: order.totals.total.toFixed(2)
+            },
+            
+            // Additional info
+            order_date: new Date(order.date).toLocaleDateString(),
+            estimated_delivery: estimatedDelivery.toLocaleDateString(),
+            customer_name: `${order.customer.firstName} ${order.customer.lastName}`,
+            shipping_address: `${order.customer.address}, ${order.customer.city}, ${order.customer.state} ${order.customer.zipCode}`,
+            payment_method: formatPaymentMethodForEmail(order.payment.method)
+        };
+        
+        // Debug: Log template parameters
+        console.log('📧 Email template parameters:', templateParams);
+        
+        // Show user that email is being sent
+        console.log('📤 Sending order confirmation email...');
+        
+        // Send email
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+            .then(function(response) {
+                console.log('✅ Order confirmation email sent successfully!', response.status, response.text);
+                // Show success message to user
+                setTimeout(() => {
+                    alert(`✅ Order confirmation email sent to: ${order.customer.email}`);
+                }, 1000);
+            })
+            .catch(function(error) {
+                console.error('❌ Failed to send order confirmation email:', error);
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    text: error.text,
+                    status: error.status
+                });
+                
+                // Show detailed error to user
+                let errorMessage = 'Order placed successfully! However, we couldn\'t send the confirmation email.\n\n';
+                
+                if (error.status === 400) {
+                    errorMessage += 'Error: Invalid template or missing required fields. Please check your EmailJS template.';
+                } else if (error.status === 401) {
+                    errorMessage += 'Error: Invalid EmailJS credentials. Please check your Service ID, Template ID, and Public Key.';
+                } else if (error.status === 402) {
+                    errorMessage += 'Error: EmailJS quota exceeded. Please check your EmailJS account limits.';
+                } else if (error.status === 404) {
+                    errorMessage += 'Error: EmailJS service or template not found. Please check your Service ID and Template ID.';
+                } else {
+                    errorMessage += `Error: ${error.message || error.text || 'Unknown error occurred'}`;
+                }
+                
+                errorMessage += '\n\nPlease contact support if needed.';
+                alert(errorMessage);
+            });
+            
+    } catch (error) {
+        console.error('❌ Error in email function:', error);
+        alert('Order placed successfully! However, there was an error with the email service. Please contact support if needed.');
+    }
+}
+
+// Test EmailJS Configuration (call this from browser console)
+function testEmailJS() {
+    const testParams = {
+        // Email recipient
+        email: "your.email@gmail.com", // CHANGE THIS TO YOUR EMAIL FOR TESTING
+        to_name: "Test User",
+        
+        // Order details
+        order_id: "TEST-001",
+        
+        // Orders array for the loop in your template
+        orders: [
+            {
+                name: "Test Product 1",
+                image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                units: 2,
+                price: "159.98"
+            },
+            {
+                name: "Test Product 2", 
+                image_url: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                units: 1,
+                price: "79.99"
+            }
+        ],
+        
+        // Cost breakdown
+        cost: {
+            shipping: "5.99",
+            tax: "19.20",
+            total: "265.16"
+        },
+        
+        // Additional info
+        order_date: new Date().toLocaleDateString(),
+        estimated_delivery: new Date().toLocaleDateString(),
+        customer_name: "Test User",
+        shipping_address: "123 Test St, Test City, TC 12345",
+        payment_method: "Credit Card"
+    };
+    
+    console.log('Testing EmailJS with parameters:', testParams);
+    
+    emailjs.send('service_9n2rlr5', 'template_icysguc', testParams)
+        .then(function(response) {
+            console.log('✅ Test email sent successfully!', response);
+            alert('✅ Test email sent successfully! Check your email.');
+        })
+        .catch(function(error) {
+            console.error('❌ Test email failed:', error);
+            alert('❌ Test email failed. Check console for details.');
+        });
+}
+
+// Helper function to format payment method for email
+function formatPaymentMethodForEmail(method) {
+    switch (method) {
+        case 'cod': return 'Cash on Delivery';
+        case 'bank-transfer': return 'Bank Transfer';
+        case 'card': return 'Credit/Debit Card';
+        default: return method;
+    }
+}
+
+// Initialize order system when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    loadOrdersFromStorage();
+    
+    // Setup checkout form submission
+    const checkoutForm = document.getElementById('checkout-form');
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', placeOrder);
+    }
+});
+
+// Export order-related functions for global access
+window.startCheckout = startCheckout;
+window.closeCheckout = closeCheckout;
+window.nextStep = nextStep;
+window.prevStep = prevStep;
+window.closeOrderConfirmation = closeOrderConfirmation;
+window.viewOrderDetails = viewOrderDetails;
